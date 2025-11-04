@@ -169,6 +169,32 @@ clockintr()
     ticks++;
     wakeup(&ticks);
     release(&tickslock);
+    
+    // MLFQ Rule 5: Priority boost
+    extern uint64 ticks_since_boost;
+    ticks_since_boost++;
+    if(ticks_since_boost >= MLFQ_BOOST_INTERVAL) {
+      mlfq_boost_all();
+      ticks_since_boost = 0;
+    }
+  }
+
+  // MLFQ Rule 4: Track time slice usage
+  struct proc *p = myproc();
+  if(p != 0 && p->state == RUNNING) {
+    p->total_ticks++;
+    p->ticks_in_queue++;
+    
+    // Check if process has used up its time slice
+    int time_slice = get_time_slice(p->priority);
+    if(p->ticks_in_queue >= time_slice) {
+      // Move to lower priority queue if not already at lowest
+      if(p->priority < NMLFQ - 1) {
+        p->priority++;
+      }
+      p->ticks_in_queue = 0;
+      p->time_slices_used++;
+    }
   }
 
   // ask for the next timer interrupt. this also clears

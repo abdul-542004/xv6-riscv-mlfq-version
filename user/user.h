@@ -2,6 +2,15 @@
 
 struct stat;
 
+// Process information structure for getprocinfo system call
+struct procinfo {
+  int pid;                     // Process ID
+  int priority;                // Current priority queue
+  unsigned long total_ticks;   // Total CPU ticks consumed
+  unsigned long num_scheduled; // Number of times scheduled
+  char name[16];               // Process name
+};
+
 // system calls
 int fork(void);
 int exit(int) __attribute__((noreturn));
@@ -24,6 +33,7 @@ int getpid(void);
 char* sys_sbrk(int,int);
 int pause(int);
 int uptime(void);
+int getprocinfo(int pid, struct procinfo* info);
 
 // ulib.c
 int stat(const char*, struct stat*);

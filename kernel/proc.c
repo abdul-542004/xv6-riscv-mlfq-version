@@ -15,6 +15,37 @@ struct proc *initproc;
 int nextpid = 1;
 struct spinlock pid_lock;
 
+// MLFQ global variables
+uint64 ticks_since_boost = 0;  // Ticks since last priority boost
+
+// Get time slice for a given priority level
+int
+get_time_slice(int priority)
+{
+  switch(priority) {
+    case 0: return MLFQ_TIME_SLICE_0;
+    case 1: return MLFQ_TIME_SLICE_1;
+    case 2: return MLFQ_TIME_SLICE_2;
+    case 3: return MLFQ_TIME_SLICE_3;
+    default: return MLFQ_TIME_SLICE_3;
+  }
+}
+
+// MLFQ Rule 5: Boost all processes to highest priority
+void
+mlfq_boost_all(void)
+{
+  struct proc *p;
+  for(p = proc; p < &proc[NPROC]; p++) {
+    acquire(&p->lock);
+    if(p->state != UNUSED) {
+      p->priority = 0;
+      p->ticks_in_queue = 0;
+    }
+    release(&p->lock);
+  }
+}
+
 extern void forkret(void);
 static void freeproc(struct proc *p);
 
@@ -146,6 +177,14 @@ found:
   p->context.ra = (uint64)forkret;
   p->context.sp = p->kstack + PGSIZE;
 
+  // Initialize MLFQ fields (Rule 3: new job enters at highest priority)
+  p->priority = 0;
+  p->time_slices_used = 0;
+  p->ticks_in_queue = 0;
+  p->total_ticks = 0;
+  p->num_scheduled = 0;
+  p->enter_time = 0;
+
   return p;
 }
 
@@ -169,6 +208,14 @@ freeproc(struct proc *p)
   p->killed = 0;
   p->xstate = 0;
   p->state = UNUSED;
+  
+  // Reset MLFQ fields
+  p->priority = 0;
+  p->time_slices_used = 0;
+  p->ticks_in_queue = 0;
+  p->total_ticks = 0;
+  p->num_scheduled = 0;
+  p->enter_time = 0;
 }
 
 // Create a user page table for a given process, with no user memory,
@@ -421,6 +468,8 @@ kwait(uint64 addr)
 //  - swtch to start running that process.
 //  - eventually that process transfers control
 //    via swtch back to the scheduler.
+//
+// MLFQ Scheduler Implementation
 void
 scheduler(void)
 {
@@ -438,23 +487,32 @@ scheduler(void)
     intr_off();
 
     int found = 0;
-    for(p = proc; p < &proc[NPROC]; p++) {
-      acquire(&p->lock);
-      if(p->state == RUNNABLE) {
-        // Switch to chosen process.  It is the process's job
-        // to release its lock and then reacquire it
-        // before jumping back to us.
-        p->state = RUNNING;
-        c->proc = p;
-        swtch(&c->context, &p->context);
+    
+    // Rule 1 & 2: Select process from highest priority queue with RUNNABLE processes
+    for(int priority = 0; priority < NMLFQ; priority++) {
+      for(p = proc; p < &proc[NPROC]; p++) {
+        acquire(&p->lock);
+        if(p->state == RUNNABLE && p->priority == priority) {
+          // Switch to chosen process.  It is the process's job
+          // to release its lock and then reacquire it
+          // before jumping back to us.
+          p->state = RUNNING;
+          c->proc = p;
+          p->num_scheduled++;
+          p->enter_time = ticks;
+          
+          swtch(&c->context, &p->context);
 
-        // Process is done running for now.
-        // It should have changed its p->state before coming back.
-        c->proc = 0;
-        found = 1;
+          // Process is done running for now.
+          // It should have changed its p->state before coming back.
+          c->proc = 0;
+          found = 1;
+        }
+        release(&p->lock);
       }
-      release(&p->lock);
+      if(found) break;  // Found a process at this priority, don't check lower priorities
     }
+    
     if(found == 0) {
       // nothing to run; stop running on this core until an interrupt.
       asm volatile("wfi");
@@ -687,4 +745,35 @@ procdump(void)
     printf("%d %s %s", p->pid, state, p->name);
     printf("\n");
   }
+}
+
+// Get process information for a specific PID
+// Returns 0 on success, -1 on error
+int
+getprocinfo(int pid, uint64 addr)
+{
+  struct proc *p;
+  struct procinfo info;
+  
+  // Find the process with the given PID
+  for(p = proc; p < &proc[NPROC]; p++) {
+    acquire(&p->lock);
+    if(p->pid == pid) {
+      // Copy process information
+      info.pid = p->pid;
+      info.priority = p->priority;
+      info.total_ticks = p->total_ticks;
+      info.num_scheduled = p->num_scheduled;
+      safestrcpy(info.name, p->name, sizeof(info.name));
+      release(&p->lock);
+      
+      // Copy to user space
+      if(copyout(myproc()->pagetable, addr, (char *)&info, sizeof(info)) < 0)
+        return -1;
+      return 0;
+    }
+    release(&p->lock);
+  }
+  
+  return -1;  // Process not found
 }
