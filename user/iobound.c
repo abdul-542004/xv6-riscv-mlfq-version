@@ -3,64 +3,37 @@
 #include "kernel/fcntl.h"
 #include "user/user.h"
 
-// I/O-intensive workload: repeatedly write and read from a file
+// Pure I/O-intensive workload: repeatedly write to a file
 int
 main(int argc, char *argv[])
 {
   int fd;
-  char buf[64];
-  int iterations = 200;  // Number of I/O operations
+  char c = '.';
+  int iterations = 500;  // Number of I/O operations
   struct procinfo info;
   int pid = getpid();
   
   printf("I/O-bound test starting (PID: %d)\n", pid);
-  printf("Performing %d I/O operations...\n", iterations);
   
   int start_time = uptime();
   
-  // Perform I/O operations
+  // Open file once
+  fd = open("iotest.txt", O_CREATE | O_WRONLY);
+  if(fd < 0) {
+    printf("Error: cannot open iotest.txt\n");
+    exit(1);
+  }
+  
+  // Perform pure I/O operations - just write dots repeatedly
   for(int i = 0; i < iterations; i++) {
-    // Write to file
-    fd = open("iotest.txt", O_CREATE | O_WRONLY);
-    if(fd < 0) {
-      printf("Error: cannot open iotest.txt for writing\n");
-      exit(1);
-    }
-    
-    // Prepare data
-    for(int j = 0; j < 64; j++) {
-      buf[j] = 'A' + (i % 26);
-    }
-    
-    // Write data
-    if(write(fd, buf, 64) != 64) {
+    if(write(fd, &c, 1) != 1) {
       printf("Error: write failed\n");
       close(fd);
       exit(1);
     }
-    close(fd);
-    
-    // Read from file
-    fd = open("iotest.txt", O_RDONLY);
-    if(fd < 0) {
-      printf("Error: cannot open iotest.txt for reading\n");
-      exit(1);
-    }
-    
-    // Read data
-    if(read(fd, buf, 64) != 64) {
-      printf("Error: read failed\n");
-      close(fd);
-      exit(1);
-    }
-    close(fd);
-    
-    // Small computation between I/O operations
-    int sum = 0;
-    for(int k = 0; k < 100; k++) {
-      sum += k;
-    }
   }
+  
+  close(fd);
   
   int end_time = uptime();
   

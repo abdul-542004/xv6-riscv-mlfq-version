@@ -182,6 +182,7 @@ clockintr()
   // MLFQ Rule 4: Track time slice usage
   struct proc *p = myproc();
   if(p != 0 && p->state == RUNNING) {
+    acquire(&p->lock);
     p->total_ticks++;
     p->ticks_in_queue++;
     
@@ -191,10 +192,12 @@ clockintr()
       // Move to lower priority queue if not already at lowest
       if(p->priority < NMLFQ - 1) {
         p->priority++;
+        p->time_slices_used = 0;  // Reset when moving to new queue
+        p->enter_time = ticks;     // Update enter time for new queue
       }
       p->ticks_in_queue = 0;
-      p->time_slices_used++;
     }
+    release(&p->lock);
   }
 
   // ask for the next timer interrupt. this also clears

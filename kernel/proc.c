@@ -41,6 +41,8 @@ mlfq_boost_all(void)
     if(p->state != UNUSED) {
       p->priority = 0;
       p->ticks_in_queue = 0;
+      p->time_slices_used = 0;
+      p->enter_time = ticks;
     }
     release(&p->lock);
   }
@@ -489,7 +491,9 @@ scheduler(void)
     int found = 0;
     
     // Rule 1 & 2: Select process from highest priority queue with RUNNABLE processes
+    // Scan all priority levels from highest to lowest
     for(int priority = 0; priority < NMLFQ; priority++) {
+      // Scan all processes at this priority level (round-robin)
       for(p = proc; p < &proc[NPROC]; p++) {
         acquire(&p->lock);
         if(p->state == RUNNABLE && p->priority == priority) {
@@ -507,12 +511,17 @@ scheduler(void)
           // It should have changed its p->state before coming back.
           c->proc = 0;
           found = 1;
+          release(&p->lock);
+          // Don't break - continue round-robin at this priority
+          goto next_iteration;
         }
         release(&p->lock);
       }
-      if(found) break;  // Found a process at this priority, don't check lower priorities
+      // If we found at least one process at this priority, don't check lower priorities
+      if(found) break;
     }
     
+next_iteration:
     if(found == 0) {
       // nothing to run; stop running on this core until an interrupt.
       asm volatile("wfi");

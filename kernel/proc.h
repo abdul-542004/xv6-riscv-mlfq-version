@@ -83,11 +83,11 @@ enum procstate { UNUSED, USED, SLEEPING, RUNNABLE, RUNNING, ZOMBIE };
 
 // MLFQ scheduling parameters
 #define NMLFQ 4                  // Number of priority queues
-#define MLFQ_TIME_SLICE_0 1      // Time slice for highest priority queue (in ticks)
-#define MLFQ_TIME_SLICE_1 2      // Time slice for second priority queue
-#define MLFQ_TIME_SLICE_2 4      // Time slice for third priority queue
-#define MLFQ_TIME_SLICE_3 8      // Time slice for lowest priority queue
-#define MLFQ_BOOST_INTERVAL 48   // Ticks before priority boost (Rule 5)
+#define MLFQ_TIME_SLICE_0 4    // Time slice for highest priority queue (in ticks)
+#define MLFQ_TIME_SLICE_1 8     // Time slice for second priority queue
+#define MLFQ_TIME_SLICE_2 16   // Time slice for third priority queue
+#define MLFQ_TIME_SLICE_3 32    // Time slice for lowest priority queue
+#define MLFQ_BOOST_INTERVAL 100   // Ticks before priority boost (Rule 5)
 
 // Per-process state
 struct proc {
