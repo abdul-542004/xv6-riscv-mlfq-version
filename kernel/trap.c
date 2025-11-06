@@ -186,16 +186,16 @@ clockintr()
     p->total_ticks++;
     p->ticks_in_queue++;
     
-    // Check if process has used up its time slice
+    // Check if process has used up its time allotment at current priority
+    // Rule 4: regardless of how many times it has given up the CPU
     int time_slice = get_time_slice(p->priority);
     if(p->ticks_in_queue >= time_slice) {
+      p->ticks_in_queue = 0;  // Reset allotment counter
       // Move to lower priority queue if not already at lowest
       if(p->priority < NMLFQ - 1) {
         p->priority++;
-        p->time_slices_used = 0;  // Reset when moving to new queue
-        p->enter_time = ticks;     // Update enter time for new queue
+        p->enter_time = ticks;  // Update enter time for new queue
       }
-      p->ticks_in_queue = 0;
     }
     release(&p->lock);
   }

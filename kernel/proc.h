@@ -115,8 +115,7 @@ struct proc {
   
   // MLFQ scheduling fields
   int priority;                // Current priority queue (0 = highest, NMLFQ-1 = lowest)
-  int time_slices_used;        // Number of time slices used at current priority
-  int ticks_in_queue;          // Ticks spent in current queue
+  int ticks_in_queue;          // CPU ticks used at current priority (allotment tracking for Rule 4)
   uint64 total_ticks;          // Total CPU ticks consumed
   uint64 num_scheduled;        // Number of times scheduled
   uint64 enter_time;           // Time when process entered current queue

@@ -41,7 +41,6 @@ mlfq_boost_all(void)
     if(p->state != UNUSED) {
       p->priority = 0;
       p->ticks_in_queue = 0;
-      p->time_slices_used = 0;
       p->enter_time = ticks;
     }
     release(&p->lock);
@@ -181,7 +180,6 @@ found:
 
   // Initialize MLFQ fields (Rule 3: new job enters at highest priority)
   p->priority = 0;
-  p->time_slices_used = 0;
   p->ticks_in_queue = 0;
   p->total_ticks = 0;
   p->num_scheduled = 0;
@@ -213,7 +211,6 @@ freeproc(struct proc *p)
   
   // Reset MLFQ fields
   p->priority = 0;
-  p->time_slices_used = 0;
   p->ticks_in_queue = 0;
   p->total_ticks = 0;
   p->num_scheduled = 0;
